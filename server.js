@@ -15,7 +15,9 @@ app.use(cors());
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+
+// Serve static files from the public folder (FIXED PATH)
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
     secret: process.env.SESSION_SECRET || 'scp-session-secret',
@@ -59,21 +61,17 @@ const processRedactedContent = (content, userClearance) => {
 
 // Save ethics history
 const saveEthicsHistory = (ethicsId, level, content, userId, changeType) => {
-    // Get current version
     db.get('SELECT version FROM code_of_ethics WHERE id = ?', [ethicsId], (err, row) => {
         if (err || !row) return;
         const newVersion = row.version + 1;
         
-        // Deactivate old version
         db.run('UPDATE code_of_ethics SET is_active = 0 WHERE id = ?', [ethicsId]);
         
-        // Insert new version
         db.run(`
             INSERT INTO code_of_ethics (clearance_level, content, version, is_active, updated_at, updated_by)
             VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP, ?)
         `, [level, content, newVersion, userId]);
         
-        // Save to history
         db.run(`
             INSERT INTO code_of_ethics_history (ethics_id, clearance_level, content, version, changed_by, change_type)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -234,26 +232,22 @@ app.get('/api/dashboard/:level', authenticateUser, (req, res) => {
         return res.status(403).json({ error: 'Insufficient clearance' });
     }
     
-    // Get active ethics for this level
     db.get('SELECT content FROM code_of_ethics WHERE clearance_level = ? AND is_active = 1', [level], (err, ethics) => {
         if (err) {
             return res.status(500).json({ error: 'Database error' });
         }
         
-        // Get active protocols
         db.all('SELECT title, content, created_at FROM protocols WHERE clearance_level <= ? AND is_active = 1 ORDER BY created_at DESC', 
             [level], (err, protocols) => {
             if (err) {
                 return res.status(500).json({ error: 'Database error' });
             }
             
-            // Get active lockdown codes
             db.get('SELECT code, description FROM lockdown_codes WHERE clearance_level = ? AND is_active = 1', [level], (err, lockdown) => {
                 if (err) {
                     return res.status(500).json({ error: 'Database error' });
                 }
                 
-                // Process redactions based on user's clearance
                 const userClearance = req.session.clearanceLevel;
                 let processedEthics = ethics ? processRedactedContent(ethics.content, userClearance) : 'No ethics code defined for this level';
                 
@@ -284,7 +278,7 @@ app.get('/api/dashboard/:level', authenticateUser, (req, res) => {
 
 // ============ ADMIN ROUTES ============
 
-// Get all active users (only show current versions)
+// Get all active users
 app.get('/api/admin/users', requireAdmin, (req, res) => {
     const isSuperAdmin = req.session.isSuperAdmin;
     let query = 'SELECT id, username, clearance_level, department, rank, is_admin, is_super_admin, last_login, created_at, version FROM users WHERE is_deleted = 0';
@@ -338,7 +332,7 @@ app.post('/api/admin/permissions', requireSuperAdmin, (req, res) => {
 
 // ============ USER MANAGEMENT WITH VERSIONING ============
 
-// Create new user (with versioning)
+// Create new user
 app.post('/api/admin/users', requireAdmin, (req, res) => {
     const { username, password, clearanceLevel, department, rank, isAdmin, isSuperAdmin } = req.body;
     
@@ -377,7 +371,7 @@ app.post('/api/admin/users', requireAdmin, (req, res) => {
     });
 });
 
-// Update user (with versioning)
+// Update user
 app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
     const userId = req.params.id;
     const { username, password, department, rank, clearanceLevel } = req.body;
@@ -431,7 +425,6 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
                 return res.status(400).json({ error: 'Update failed' });
             }
             
-            // Get updated user data for history
             db.get('SELECT * FROM users WHERE id = ?', [userId], (err, updatedUser) => {
                 if (err || !updatedUser) return;
                 
@@ -450,7 +443,7 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
     });
 });
 
-// Delete user (soft delete with versioning)
+// Delete user
 app.delete('/api/admin/users/:id', requireSuperAdmin, (req, res) => {
     const userId = req.params.id;
     
@@ -509,7 +502,7 @@ app.get('/api/admin/ethics', requireAdmin, (req, res) => {
     });
 });
 
-// Update Code of Ethics (with versioning)
+// Update Code of Ethics
 app.put('/api/admin/ethics/:level', requireAdmin, (req, res) => {
     const level = req.params.level;
     const { content } = req.body;
@@ -519,17 +512,14 @@ app.put('/api/admin/ethics/:level', requireAdmin, (req, res) => {
             return res.status(403).json({ error: 'Permission denied' });
         }
         
-        // Get current ethics entry
         db.get('SELECT id, version FROM code_of_ethics WHERE clearance_level = ? AND is_active = 1', [level], (err, current) => {
             if (err) {
                 return res.status(500).json({ error: 'Database error' });
             }
             
             if (current) {
-                // Deactivate old version
                 db.run('UPDATE code_of_ethics SET is_active = 0 WHERE id = ?', [current.id]);
                 
-                // Insert new version
                 const newVersion = current.version + 1;
                 db.run(`
                     INSERT INTO code_of_ethics (clearance_level, content, version, is_active, updated_at, updated_by)
@@ -539,7 +529,6 @@ app.put('/api/admin/ethics/:level', requireAdmin, (req, res) => {
                         return res.status(500).json({ error: 'Update failed' });
                     }
                     
-                    // Save to history
                     db.run(`
                         INSERT INTO code_of_ethics_history (ethics_id, clearance_level, content, version, changed_by, change_type)
                         VALUES (?, ?, ?, ?, ?, ?)
@@ -550,7 +539,6 @@ app.put('/api/admin/ethics/:level', requireAdmin, (req, res) => {
                     res.json({ success: true, version: newVersion });
                 });
             } else {
-                // No existing entry, create new
                 db.run(`
                     INSERT INTO code_of_ethics (clearance_level, content, version, is_active, updated_at, updated_by)
                     VALUES (?, ?, 1, 1, CURRENT_TIMESTAMP, ?)
@@ -586,7 +574,7 @@ app.get('/api/admin/ethics/:level/history', requireAdmin, (req, res) => {
     });
 });
 
-// Rollback ethics to specific version
+// Rollback ethics
 app.post('/api/admin/ethics/:level/rollback/:version', requireSuperAdmin, (req, res) => {
     const level = req.params.level;
     const targetVersion = parseInt(req.params.version);
@@ -600,10 +588,8 @@ app.post('/api/admin/ethics/:level/rollback/:version', requireSuperAdmin, (req, 
             return res.status(404).json({ error: 'Version not found' });
         }
         
-        // Deactivate current version
         db.run('UPDATE code_of_ethics SET is_active = 0 WHERE clearance_level = ? AND is_active = 1', [level]);
         
-        // Restore from history
         db.run(`
             INSERT INTO code_of_ethics (clearance_level, content, version, is_active, updated_at, updated_by)
             VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP, ?)
@@ -627,7 +613,7 @@ app.get('/api/admin/protocols', requireAdmin, (req, res) => {
     });
 });
 
-// Add new protocol (with versioning)
+// Add new protocol
 app.post('/api/admin/protocols', requireAdmin, (req, res) => {
     const { title, content, clearanceLevel } = req.body;
     
@@ -640,10 +626,8 @@ app.post('/api/admin/protocols', requireAdmin, (req, res) => {
             return res.status(403).json({ error: 'Permission denied' });
         }
         
-        // Check if protocol with same title exists
         db.get('SELECT id, version FROM protocols WHERE title = ? AND is_active = 1', [title], (err, existing) => {
             if (existing) {
-                // Deactivate old version
                 db.run('UPDATE protocols SET is_active = 0 WHERE id = ?', [existing.id]);
                 
                 const newVersion = existing.version + 1;
@@ -666,7 +650,6 @@ app.post('/api/admin/protocols', requireAdmin, (req, res) => {
                     res.json({ success: true, protocolId, version: newVersion });
                 });
             } else {
-                // New protocol
                 db.run(`
                     INSERT INTO protocols (title, content, clearance_level, version, is_active, created_at, created_by)
                     VALUES (?, ?, ?, 1, 1, CURRENT_TIMESTAMP, ?)
@@ -708,7 +691,7 @@ app.get('/api/admin/protocols/:id/history', requireAdmin, (req, res) => {
     });
 });
 
-// Rollback protocol to specific version
+// Rollback protocol
 app.post('/api/admin/protocols/:id/rollback/:version', requireSuperAdmin, (req, res) => {
     const protocolId = req.params.id;
     const targetVersion = parseInt(req.params.version);
@@ -722,10 +705,8 @@ app.post('/api/admin/protocols/:id/rollback/:version', requireSuperAdmin, (req, 
             return res.status(404).json({ error: 'Version not found' });
         }
         
-        // Deactivate current version
         db.run('UPDATE protocols SET is_active = 0 WHERE id = ?', [protocolId]);
         
-        // Restore from history
         db.run(`
             INSERT INTO protocols (title, content, clearance_level, version, is_active, created_at, created_by)
             VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, ?)
@@ -749,7 +730,7 @@ app.get('/api/admin/lockdown', requireAdmin, (req, res) => {
     });
 });
 
-// Update lockdown code (with versioning)
+// Update lockdown code
 app.put('/api/admin/lockdown/:level', requireAdmin, (req, res) => {
     const level = req.params.level;
     const { code, description } = req.body;
@@ -825,7 +806,7 @@ app.get('/api/admin/lockdown/:level/history', requireAdmin, (req, res) => {
     });
 });
 
-// Rollback lockdown to specific version
+// Rollback lockdown
 app.post('/api/admin/lockdown/:level/rollback/:version', requireSuperAdmin, (req, res) => {
     const level = req.params.level;
     const targetVersion = parseInt(req.params.version);
@@ -839,10 +820,8 @@ app.post('/api/admin/lockdown/:level/rollback/:version', requireSuperAdmin, (req
             return res.status(404).json({ error: 'Version not found' });
         }
         
-        // Deactivate current version
         db.run('UPDATE lockdown_codes SET is_active = 0 WHERE clearance_level = ? AND is_active = 1', [level]);
         
-        // Restore from history
         db.run(`
             INSERT INTO lockdown_codes (clearance_level, code, description, version, is_active, updated_at, updated_by)
             VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, ?)
@@ -856,7 +835,7 @@ app.post('/api/admin/lockdown/:level/rollback/:version', requireSuperAdmin, (req
 
 // ============ REDACTION ROUTES ============
 
-// Redact Ethics Content
+// Redact Ethics
 app.put('/api/admin/ethics/redact', requireAdmin, (req, res) => {
     const { level, content } = req.body;
     
@@ -865,14 +844,12 @@ app.put('/api/admin/ethics/redact', requireAdmin, (req, res) => {
             return res.status(403).json({ error: 'Permission denied' });
         }
         
-        // Get current active version
         db.get('SELECT id, version FROM code_of_ethics WHERE clearance_level = ? AND is_active = 1', [level], (err, current) => {
             if (err) {
                 return res.status(500).json({ error: 'Database error' });
             }
             
             if (current) {
-                // Deactivate old version
                 db.run('UPDATE code_of_ethics SET is_active = 0 WHERE id = ?', [current.id]);
                 
                 const newVersion = current.version + 1;
