@@ -5,6 +5,99 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SCP Foundation - Admin Console</title>
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+        /* Redaction color styles for admin panel */
+        .redaction-crimson {
+            background-color: #dc143c;
+            color: #dc143c;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        .redaction-dark-red {
+            background-color: #8b0000;
+            color: #8b0000;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        .redaction-purple {
+            background-color: #800080;
+            color: #800080;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        .redaction-dark-green {
+            background-color: #006400;
+            color: #006400;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        .redaction-black {
+            background-color: #000000;
+            color: #000000;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+            border: 1px solid #333;
+        }
+        .version-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 3px;
+            font-size: 11px;
+            margin-left: 10px;
+        }
+        .version-current {
+            background: rgba(0, 255, 0, 0.2);
+            border: 1px solid #00ff00;
+            color: #00ff00;
+        }
+        .version-old {
+            background: rgba(255, 255, 0, 0.1);
+            border: 1px solid #ffff00;
+            color: #ffff00;
+        }
+        .rollback-btn {
+            background: transparent;
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            padding: 2px 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            transition: all 0.3s;
+        }
+        .rollback-btn:hover {
+            background: #ff6b6b;
+            color: #000000;
+        }
+        .history-table {
+            width: 100%;
+            font-size: 12px;
+            border-collapse: collapse;
+        }
+        .history-table th {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid rgba(0, 255, 0, 0.2);
+            padding: 8px;
+            text-align: left;
+        }
+        .history-table td {
+            border: 1px solid rgba(0, 255, 0, 0.1);
+            padding: 8px;
+        }
+        .history-table tr:hover {
+            background: rgba(0, 255, 0, 0.05);
+        }
+        .change-type-create { color: #00ff00; }
+        .change-type-update { color: #ffff00; }
+        .change-type-delete { color: #ff6b6b; }
+        .change-type-redact { color: #ff8800; }
+        .change-type-rollback { color: #00ffff; }
+    </style>
 </head>
 <body>
     <div class="admin-container">
@@ -26,6 +119,7 @@
             <button data-target="protocols">📋 Protocols</button>
             <button data-target="lockdown">🔒 Lockdown Codes</button>
             <button data-target="redaction">🔴 Redaction Manager</button>
+            <button data-target="history">📊 Version History</button>
             <button data-target="logs">📊 Activity Logs</button>
         </div>
         
@@ -42,12 +136,13 @@
                             <th>Rank</th>
                             <th>Admin</th>
                             <th>Super</th>
+                            <th>Version</th>
                             <th>Last Login</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="usersTableBody">
-                        <tr><td colspan="8">Loading...</td></tr>
+                        <tr><td colspan="9">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -195,6 +290,17 @@
                 Example: <strong>[REDACT:3:This text is classified]</strong>
             </p>
             
+            <div style="margin-bottom: 20px; padding: 10px; border: 1px solid rgba(0,255,0,0.2);">
+                <h4>Redaction Color Legend:</h4>
+                <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 10px;">
+                    <span><span class="redaction-crimson">██████</span> Crimson (Level 4)</span>
+                    <span><span class="redaction-dark-red">██████</span> Dark Red (Level 3/4)</span>
+                    <span><span class="redaction-dark-green">██████</span> Dark Green (Level 2)</span>
+                    <span><span class="redaction-purple">██████</span> Purple (Level 6)</span>
+                    <span><span class="redaction-black">██████</span> Black (Level 3)</span>
+                </div>
+            </div>
+            
             <div class="admin-form">
                 <h3>Redact Ethics Content</h3>
                 <form id="redactEthicsForm">
@@ -262,6 +368,20 @@
                     </div>
                     <button type="submit">Apply Redactions to Lockdown</button>
                 </form>
+            </div>
+        </div>
+        
+        <!-- Version History Panel -->
+        <div class="admin-panel" id="history" style="display:none;">
+            <h2>📜 Version History</h2>
+            <div style="margin: 15px 0; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button onclick="loadHistory('ethics')" class="history-tab active" style="background: transparent; border: 1px solid #00ff00; color: #00ff00; padding: 8px 16px; cursor: pointer; font-family: 'Courier New', monospace;">Ethics History</button>
+                <button onclick="loadHistory('protocols')" class="history-tab" style="background: transparent; border: 1px solid #00ff00; color: #00ff00; padding: 8px 16px; cursor: pointer; font-family: 'Courier New', monospace;">Protocols History</button>
+                <button onclick="loadHistory('lockdown')" class="history-tab" style="background: transparent; border: 1px solid #00ff00; color: #00ff00; padding: 8px 16px; cursor: pointer; font-family: 'Courier New', monospace;">Lockdown History</button>
+                <button onclick="loadHistory('users')" class="history-tab" style="background: transparent; border: 1px solid #00ff00; color: #00ff00; padding: 8px 16px; cursor: pointer; font-family: 'Courier New', monospace;">User History</button>
+            </div>
+            <div id="historyContent" style="max-height: 600px; overflow-y: auto;">
+                <p style="color: rgba(0,255,0,0.5);">Select a history type to view versions.</p>
             </div>
         </div>
         
