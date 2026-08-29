@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCP Foundation - Personnel Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">SCP FOUNDATION - PERSONNEL DASHBOARD</div>
+            <div class="dashboard-user-info">
+                <div>
+                    <span class="clearance-badge" id="clearanceDisplay">CLEARANCE: LEVEL 1</span>
+                    <span id="usernameDisplay" style="margin-left: 15px;">USERNAME</span>
+                    <span id="rankDisplay" style="margin-left: 15px;">RANK</span>
+                    <span id="departmentDisplay" style="margin-left: 15px;">DEPARTMENT</span>
+                </div>
+                <button class="logout-btn" id="logoutBtn">LOGOUT</button>
+            </div>
+        </div>
+        
+        <div class="dashboard-grid">
+            <!-- Code of Ethics -->
+            <div class="dashboard-section">
+                <h2>📜 CODE OF ETHICS</h2>
+                <div class="content" id="ethicsContent">
+                    Loading...
+                </div>
+            </div>
+            
+            <!-- Lockdown Response -->
+            <div class="dashboard-section">
+                <h2>🔒 LOCKDOWN RESPONSE CODE</h2>
+                <div class="content" id="lockdownContent">
+                    Loading...
+                </div>
+            </div>
+            
+            <!-- Protocols -->
+            <div class="dashboard-section" style="grid-column: 1/-1;">
+                <h2>📋 PROTOCOL LIST</h2>
+                <div class="content" id="protocolsContent">
+                    Loading...
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src
