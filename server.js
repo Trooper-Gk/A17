@@ -15,7 +15,7 @@ app.use(cors());
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+app.use(express.static('src/public'));
 
 app.use(session({
     secret: process.env.SESSION_SECRET || 'scp-session-secret',
@@ -616,7 +616,7 @@ app.put('/api/admin/lockdown/redact', requireAdmin, (req, res) => {
 
 // ============ SERVE HTML ============
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+    res.sendFile(path.join(__dirname, 'src', 'public', 'login.html'));
 });
 
 app.listen(PORT, () => {
