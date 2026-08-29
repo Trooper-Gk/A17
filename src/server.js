@@ -7,46 +7,56 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
 
-const db = require('./database');
+// ============ FIX: Correct paths for files ============
+// database.js is one level up from server.js
+const db = require('../database');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ============ FIND THE CORRECT PUBLIC PATH ============
-// Try multiple possible locations for the public folder
-const possiblePaths = [
-    path.join(__dirname, 'public'),           // /opt/render/project/src/public
-    path.join(__dirname, '../public'),        // /opt/render/project/public
-    path.join(__dirname, '../../public'),     // /opt/render/public
-    path.join(process.cwd(), 'public'),       // /opt/render/project/src/public (same as __dirname)
-    path.join(process.cwd(), '../public'),    // /opt/render/project/public
-];
+// ============ FIX: Ensure public folder exists ============
+// public folder is at the same level as server.js (inside src/)
+const publicPath = path.join(__dirname, 'public');
+console.log(`📁 Current directory: ${__dirname}`);
+console.log(`📁 Looking for public at: ${publicPath}`);
 
-let publicPath = null;
-for (const testPath of possiblePaths) {
-    const testFile = path.join(testPath, 'login.html');
-    if (fs.existsSync(testFile)) {
-        publicPath = testPath;
-        console.log(`✅ Found public folder at: ${publicPath}`);
-        break;
+// Check if public folder exists
+if (!fs.existsSync(publicPath)) {
+    console.log('⚠️ public folder not found, creating it...');
+    fs.mkdirSync(publicPath, { recursive: true });
+}
+
+// Check if login.html exists in public
+const loginPath = path.join(publicPath, 'login.html');
+if (!fs.existsSync(loginPath)) {
+    console.log('⚠️ login.html not found in public folder');
+    
+    // Try to find it in parent public (if it got nested)
+    const altPath = path.join(__dirname, '../public', 'login.html');
+    if (fs.existsSync(altPath)) {
+        console.log(`✅ Found login.html at: ${altPath}`);
+        fs.copyFileSync(altPath, loginPath);
+        console.log('📄 Copied login.html to public folder');
+    } else {
+        // Create a simple fallback login.html
+        console.log('⚠️ Creating fallback login.html');
+        const fallbackHtml = `<!DOCTYPE html>
+<html>
+<head><title>SCP Foundation</title></head>
+<body style="background:#0a0a0a;color:#00ff00;font-family:monospace;display:flex;justify-content:center;align-items:center;height:100vh;">
+<div style="text-align:center;border:1px solid #00ff00;padding:40px;">
+<h1>SCP FOUNDATION</h1>
+<p>Server is running but login.html is missing.</p>
+<p>Please check your deployment.</p>
+</div>
+</body>
+</html>`;
+        fs.writeFileSync(loginPath, fallbackHtml);
+        console.log('✅ Created fallback login.html');
     }
 }
 
-// If none found, check if the folder exists but without login.html
-if (!publicPath) {
-    for (const testPath of possiblePaths) {
-        if (fs.existsSync(testPath)) {
-            console.log(`⚠️ public folder exists at ${testPath} but login.html not found`);
-            const files = fs.readdirSync(testPath);
-            console.log(`Files in folder: ${files.join(', ')}`);
-        }
-    }
-    // Default to __dirname/public (the original location)
-    publicPath = path.join(__dirname, 'public');
-    console.log(`⚠️ Using default path: ${publicPath}`);
-}
-
-console.log(`📁 Using public folder at: ${publicPath}`);
-console.log(`📄 login.html exists: ${fs.existsSync(path.join(publicPath, 'login.html'))}`);
+console.log(`📄 login.html exists: ${fs.existsSync(loginPath)}`);
 
 // Middleware
 app.use(cors());
@@ -54,7 +64,7 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from the found public folder
+// Serve static files from the public folder
 app.use(express.static(publicPath));
 
 app.use(session({
@@ -1043,8 +1053,6 @@ app.get('/api/admin/logs', requireAdmin, (req, res) => {
 });
 
 // ============ SERVE HTML ============
-
-// Serve the login page at the root URL
 app.get('/', (req, res) => {
     const filePath = path.join(publicPath, 'login.html');
     console.log(`📄 Serving login.html from: ${filePath}`);
