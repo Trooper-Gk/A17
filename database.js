@@ -4,7 +4,7 @@ const path = require('path');
 
 const db = new sqlite3.Database('./scp_foundation.db');
 
-// Initialize database
+// Initialize database with versioning
 db.serialize(() => {
     // Users table
     db.run(`
@@ -18,45 +18,124 @@ db.serialize(() => {
             is_admin BOOLEAN DEFAULT 0,
             is_super_admin BOOLEAN DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            last_login DATETIME
+            last_login DATETIME,
+            version INTEGER DEFAULT 1,
+            is_deleted BOOLEAN DEFAULT 0
         )
     `);
 
-    // Code of Ethics table
+    // User version history
+    db.run(`
+        CREATE TABLE IF NOT EXISTS users_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            username TEXT,
+            password TEXT,
+            clearance_level INTEGER,
+            department TEXT,
+            rank TEXT,
+            is_admin BOOLEAN,
+            is_super_admin BOOLEAN,
+            version INTEGER,
+            changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            changed_by INTEGER,
+            change_type TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (changed_by) REFERENCES users(id)
+        )
+    `);
+
+    // Code of Ethics table (current version)
     db.run(`
         CREATE TABLE IF NOT EXISTS code_of_ethics (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             clearance_level INTEGER NOT NULL,
             content TEXT NOT NULL,
+            version INTEGER DEFAULT 1,
+            is_active BOOLEAN DEFAULT 1,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_by INTEGER,
             FOREIGN KEY (updated_by) REFERENCES users(id)
         )
     `);
 
-    // Protocols table
+    // Code of Ethics history table
+    db.run(`
+        CREATE TABLE IF NOT EXISTS code_of_ethics_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ethics_id INTEGER,
+            clearance_level INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            version INTEGER,
+            changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            changed_by INTEGER,
+            change_type TEXT,
+            FOREIGN KEY (ethics_id) REFERENCES code_of_ethics(id),
+            FOREIGN KEY (changed_by) REFERENCES users(id)
+        )
+    `);
+
+    // Protocols table (current version)
     db.run(`
         CREATE TABLE IF NOT EXISTS protocols (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             content TEXT NOT NULL,
             clearance_level INTEGER NOT NULL,
+            version INTEGER DEFAULT 1,
+            is_active BOOLEAN DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             created_by INTEGER,
             FOREIGN KEY (created_by) REFERENCES users(id)
         )
     `);
 
-    // Lockdown Response Codes table
+    // Protocols history table
+    db.run(`
+        CREATE TABLE IF NOT EXISTS protocols_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            protocol_id INTEGER,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            clearance_level INTEGER,
+            version INTEGER,
+            changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            changed_by INTEGER,
+            change_type TEXT,
+            FOREIGN KEY (protocol_id) REFERENCES protocols(id),
+            FOREIGN KEY (changed_by) REFERENCES users(id)
+        )
+    `);
+
+    // Lockdown Response Codes table (current version)
     db.run(`
         CREATE TABLE IF NOT EXISTS lockdown_codes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             clearance_level INTEGER NOT NULL,
             code TEXT NOT NULL,
             description TEXT,
+            version INTEGER DEFAULT 1,
+            is_active BOOLEAN DEFAULT 1,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_by INTEGER,
             FOREIGN KEY (updated_by) REFERENCES users(id)
+        )
+    `);
+
+    // Lockdown codes history table
+    db.run(`
+        CREATE TABLE IF NOT EXISTS lockdown_codes_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            lockdown_id INTEGER,
+            clearance_level INTEGER NOT NULL,
+            code TEXT NOT NULL,
+            description TEXT,
+            version INTEGER,
+            changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            changed_by INTEGER,
+            change_type TEXT,
+            FOREIGN KEY (lockdown_id) REFERENCES lockdown_codes(id),
+            FOREIGN KEY (changed_by) REFERENCES users(id)
         )
     `);
 
@@ -90,14 +169,14 @@ db.serialize(() => {
         )
     `);
 
-    // Create default super admin
+    // Create default super admin if not exists
     const defaultPassword = bcrypt.hashSync('SCP-Admin-2024', 10);
     db.run(`
         INSERT OR IGNORE INTO users (username, password, clearance_level, is_admin, is_super_admin)
         VALUES ('super_admin', ?, 6, 1, 1)
     `, [defaultPassword]);
 
-    // Create default ethics for all levels
+    // Create default ethics for all levels with version 1
     const defaultEthics = [
         { level: 1, content: 'Level 1: Standard Foundation Protocols - Follow all basic safety procedures and report any anomalies immediately.' },
         { level: 2, content: 'Level 2: Personnel must maintain confidentiality and follow containment procedures for Euclid-class entities.' },
@@ -108,13 +187,17 @@ db.serialize(() => {
     ];
 
     defaultEthics.forEach(ethics => {
-        db.run(`
-            INSERT OR IGNORE INTO code_of_ethics (clearance_level, content)
-            VALUES (?, ?)
-        `, [ethics.level, ethics.content]);
+        db.get('SELECT id FROM code_of_ethics WHERE clearance_level = ?', [ethics.level], (err, row) => {
+            if (!row) {
+                db.run(`
+                    INSERT INTO code_of_ethics (clearance_level, content, version, is_active)
+                    VALUES (?, ?, 1, 1)
+                `, [ethics.level, ethics.content]);
+            }
+        });
     });
 
-    // Create default lockdown codes
+    // Create default lockdown codes with version 1
     const defaultLockdowns = [
         { level: 1, code: 'LOC-1', description: 'Standard lockdown - All personnel report to designated safe zones.' },
         { level: 2, code: 'LOC-2', description: 'Containment breach - Secure all Euclid-class containment units.' },
@@ -125,10 +208,14 @@ db.serialize(() => {
     ];
 
     defaultLockdowns.forEach(lockdown => {
-        db.run(`
-            INSERT OR IGNORE INTO lockdown_codes (clearance_level, code, description)
-            VALUES (?, ?, ?)
-        `, [lockdown.level, lockdown.code, lockdown.description]);
+        db.get('SELECT id FROM lockdown_codes WHERE clearance_level = ?', [lockdown.level], (err, row) => {
+            if (!row) {
+                db.run(`
+                    INSERT INTO lockdown_codes (clearance_level, code, description, version, is_active)
+                    VALUES (?, ?, ?, 1, 1)
+                `, [lockdown.level, lockdown.code, lockdown.description]);
+            }
+        });
     });
 });
 
