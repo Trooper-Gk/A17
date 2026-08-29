@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCP Foundation - Admin Console</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="admin-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">SCP FOUNDATION - ADMIN CONSOLE</div>
+            <div class="dashboard-user-info">
+                <div>
+                    <span class="clearance-badge" id="clearanceDisplay">CLEARANCE: LEVEL 6</span>
+                    <span id="usernameDisplay" style="margin-left: 15px;">USERNAME</span>
+                    <span id="adminBadge" style="margin-left: 15px; color: #ff0000;">ADMIN</span>
+                </div>
+                <button class="logout-btn" id="logoutBtn">LOGOUT</button>
+            </div>
+        </div>
+        
+        <div class="admin-nav">
+            <button data-target="users" class="active">👥 Users</button>
+            <button data-target="ethics">📜 Code of Ethics</button>
+            <button data-target="protocols">📋 Protocols</button>
+            <button data-target="lockdown">🔒 Lockdown Codes</button>
+            <button data-target="redaction">🔴 Redaction Manager</button>
+            <button data-target="logs">📊 Activity Logs</button>
+        </div>
+        
+        <!-- Users Panel -->
+        <div class="admin-panel" id="users">
+            <h2>User Management</h2>
+            <div style="margin: 20px 0; max-height: 400px; overflow-y: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Clearance</th>
+                            <th>Department</th>
+                            <th>Rank</th>
+                            <th>Admin</th>
+                            <th>Super</th>
+                            <th>Last Login</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <tr><td colspan="8">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="admin-form">
+                <h3>Create New User</h3>
+                <form id="createUserForm">
+                    <div class="form-group">
+                        <label>Username:</label>
+                        <input type="text" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password:</label>
+                        <input type="password" name="password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Clearance Level:</label>
+                        <select name="clearanceLevel">
+                            <option value="1">Level 1</option>
+                            <option value="2">Level 2</option>
+                            <option value="3">Level 3</option>
+                            <option value="4">Level 4</option>
+                            <option value="5">Level 5</option>
+                            <option value="6">Level 6</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Department:</label>
+                        <input type="text" name="department" placeholder="e.g., Research">
+                    </div>
+                    <div class="form-group">
+                        <label>Rank:</label>
+                        <input type="text" name="rank" placeholder="e.g., Scientist">
+                    </div>
+                    <div class="form-group">
+                        <label>Admin:</label>
+                        <input type="checkbox" name="isAdmin">
+                    </div>
+                    <div class="form-group">
+                        <label>Super Admin:</label>
+                        <input type="checkbox" name="isSuperAdmin">
+                    </div>
+                    <button type="submit">Create User</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Ethics Panel -->
+        <div class="admin-panel" id="ethics" style="display:none;">
+            <h2>Code of Ethics Management</h2>
+            <div id="ethicsList" style="margin: 20px 0; max-height: 300px; overflow-y: auto;"></div>
+            
+            <div class="admin-form">
+                <h3>Edit Code of Ethics</h3>
+                <form id="editEthicsForm">
+                    <div class="form-group">
+                        <label>Clearance Level:</label>
+                        <select name="level" id="ethicsLevel">
+                            <option value="1">Level 1</option>
+                            <option value="2">Level 2</option>
+                            <option value="3">Level 3</option>
+                            <option value="4">Level 4</option>
+                            <option value="5">Level 5</option>
+                            <option value="6">Level 6</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Content:</label>
+                        <textarea name="content" id="ethicsContent" rows="4"></textarea>
+                    </div>
+                    <button type="submit">Update Ethics</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Protocols Panel -->
+        <div class="admin-panel" id="protocols" style="display:none;">
+            <h2>Protocol Management</h2>
+            <div id="protocolsList" style="margin: 20px 0; max-height: 300px; overflow-y: auto;"></div>
+            
+            <div class="admin-form">
+                <h3>Add New Protocol</h3>
+                <form id="createProtocolForm">
+                    <div class="form-group">
+                        <label>Title:</label>
+                        <input type="text" name="protocolTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Content:</label>
+                        <textarea name="protocolContent" rows="3" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Clearance Level:</label>
+                        <select name="protocolLevel">
+                            <option value="1">Level 1</option>
+                            <option value="2">Level 2</option>
+                            <option value="3">Level 3</option>
+                            <option value="4">Level 4</option>
+                            <option value="5">Level 5</option>
+                            <option value="6">Level 6</option>
+                        </select>
+                    </div>
+                    <button type="submit">Add Protocol</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Lockdown Panel -->
+        <div class="admin-panel" id="lockdown" style="display:none;">
+            <h2>Lockdown Response Codes</h2>
+            <div id="lockdownList" style="margin: 20px 0; max-height: 300px; overflow-y: auto;"></div>
+            
+            <div class="admin-form">
+                <h3>Edit Lockdown Code</h3>
+                <form id="editLockdownForm">
+                    <div class="form-group">
+                        <label>Clearance Level:</label>
+                        <select name="level" id="lockdownLevel">
+                            <option value="1">Level 1</option>
+                            <option value="2">Level 2</option>
+                            <option value="3">Level 3</option>
+                            <option value="4">Level 4</option>
+                            <option value="5">Level 5</option>
+                            <option value="6">Level 6</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Code:</label>
+                        <input type="text" name="code" id="lockdownCode" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description:</label>
+                        <textarea name="description" id="lockdownDescription" rows="3" required></textarea>
+                    </div>
+                    <button type="submit">Update Lockdown Code</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Redaction Manager Panel -->
+        <div class="admin-panel" id="redaction" style="display:none;">
+            <h2>🔴 Redaction Manager</h2>
+            <p style="color: rgba(0,255,0,0.6); margin-bottom: 20px;">
+                Use <strong>[REDACT:X:TEXT]</strong> format where X is the minimum clearance level required to see the text.<br>
+                Example: <strong>[REDACT:3:This text is classified]</strong>
+            </p>
+            
+            <div class="admin-form">
+                <h3>Redact Ethics Content</h3>
+                <form id="redactEthicsForm">
+                    <div class="form-group">
+                        <label>Clearance Level:</label>
+                        <select name="level" id="redactEthicsLevel">
+                            <option value="1">Level 1</option>
+                            <option value="2">Level 2</option>
+                            <option value="3">Level 3</option>
+                            <option value="4">Level 4</option>
+                            <option value="5">Level 5</option>
+                            <option value="6">Level 6</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Content with Redactions:</label>
+                        <textarea name="content" id="redactEthicsContent" rows="6" 
+                            placeholder="Example: Level 1 personnel can see this. [REDACT:3:Only Level 3+ can see this classified info.]"></textarea>
+                    </div>
+                    <button type="submit">Apply Redactions to Ethics</button>
+                </form>
+            </div>
+            
+            <div class="admin-form">
+                <h3>Redact Protocol</h3>
+                <form id="redactProtocolForm">
+                    <div class="form-group">
+                        <label>Select Protocol:</label>
+                        <select name="protocolId" id="redactProtocolSelect">
+                            <option value="">Loading protocols...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Content with Redactions:</label>
+                        <textarea name="content" id="redactProtocolContent" rows="6" 
+                            placeholder="Add [REDACT:X:TEXT] to redact specific parts"></textarea>
+                    </div>
+                    <button type="submit">Apply Redactions to Protocol</button>
+                </form>
+            </div>
+            
+            <div class="admin-form">
+                <h3>Redact Lockdown Code</h3>
+                <form id="redactLockdownForm">
+                    <div class="form-group">
+                        <label>Clearance Level:</label>
+                        <select name="level" id="redactLockdownLevel">
+                            <option value="1">Level 1</option>
+                            <option value="2">Level 2</option>
+                            <option value="3">Level 3</option>
+                            <option value="4">Level 4</option>
+                            <option value="5">Level 5</option>
+                            <option value="6">Level 6</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Code with Redactions:</label>
+                        <input type="text" name="code" id="redactLockdownCode" 
+                            placeholder="Example: [REDACT:3:LOC-3]">
+                    </div>
+                    <div class="form-group">
+                        <label>Description with Redactions:</label>
+                        <textarea name="description" id="redactLockdownDescription" rows="3" 
+                            placeholder="Add redactions to description"></textarea>
+                    </div>
+                    <button type="submit">Apply Redactions to Lockdown</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Logs Panel -->
+        <div class="admin-panel" id="logs" style="display:none;">
+            <h2>Activity Logs</h2>
+            <div style="overflow-x: auto; max-height: 600px; overflow-y: auto;">
+                <table id="logsTable">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Username</th>
+                            <th>Action</th>
+                            <th>Page</th>
+                            <th>Details</th>
+                            <th>IP Address</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsTableBody">
+                        <tr><td colspan="6">Loading logs...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="logsPagination" style="margin-top: 20px; text-align: center;"></div>
+        </div>
+    </div>
+    
+    <script src="/js/admin.js"></script>
+</body>
+</html>
