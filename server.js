@@ -4,45 +4,49 @@ const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const path = require('path');
-const fs = require('fs'); // Add this to check if files exist
+const fs = require('fs');
 require('dotenv').config();
 
 const db = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ============ DEBUG: Check if files exist ============
-console.log('=== DEBUG INFO ===');
-console.log('Current directory (__dirname):', __dirname);
-console.log('Looking for public folder at:', path.join(__dirname, 'public'));
+// ============ FIND THE CORRECT PUBLIC PATH ============
+// Try multiple possible locations for the public folder
+const possiblePaths = [
+    path.join(__dirname, 'public'),           // /opt/render/project/src/public
+    path.join(__dirname, '../public'),        // /opt/render/project/public
+    path.join(__dirname, '../../public'),     // /opt/render/public
+    path.join(process.cwd(), 'public'),       // /opt/render/project/src/public (same as __dirname)
+    path.join(process.cwd(), '../public'),    // /opt/render/project/public
+];
 
-// Check if public folder exists
-const publicPath = path.join(__dirname, 'public');
-if (fs.existsSync(publicPath)) {
-    console.log('✅ public folder FOUND at:', publicPath);
-    
-    // List all files in public folder
-    const files = fs.readdirSync(publicPath);
-    console.log('Files in public folder:', files);
-    
-    // Check if login.html exists
-    const loginPath = path.join(publicPath, 'login.html');
-    if (fs.existsSync(loginPath)) {
-        console.log('✅ login.html FOUND at:', loginPath);
-    } else {
-        console.log('❌ login.html NOT FOUND at:', loginPath);
-    }
-} else {
-    console.log('❌ public folder NOT FOUND at:', publicPath);
-    
-    // Try alternative paths
-    const altPath1 = path.join(__dirname, '../public');
-    console.log('Checking alternative path:', altPath1);
-    if (fs.existsSync(altPath1)) {
-        console.log('✅ public folder FOUND at alternative path:', altPath1);
+let publicPath = null;
+for (const testPath of possiblePaths) {
+    const testFile = path.join(testPath, 'login.html');
+    if (fs.existsSync(testFile)) {
+        publicPath = testPath;
+        console.log(`✅ Found public folder at: ${publicPath}`);
+        break;
     }
 }
-console.log('=== END DEBUG ===\n');
+
+// If none found, check if the folder exists but without login.html
+if (!publicPath) {
+    for (const testPath of possiblePaths) {
+        if (fs.existsSync(testPath)) {
+            console.log(`⚠️ public folder exists at ${testPath} but login.html not found`);
+            const files = fs.readdirSync(testPath);
+            console.log(`Files in folder: ${files.join(', ')}`);
+        }
+    }
+    // Default to __dirname/public (the original location)
+    publicPath = path.join(__dirname, 'public');
+    console.log(`⚠️ Using default path: ${publicPath}`);
+}
+
+console.log(`📁 Using public folder at: ${publicPath}`);
+console.log(`📄 login.html exists: ${fs.existsSync(path.join(publicPath, 'login.html'))}`);
 
 // Middleware
 app.use(cors());
@@ -50,8 +54,8 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from the public folder
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files from the found public folder
+app.use(express.static(publicPath));
 
 app.use(session({
     secret: process.env.SESSION_SECRET || 'scp-session-secret',
@@ -1042,16 +1046,16 @@ app.get('/api/admin/logs', requireAdmin, (req, res) => {
 
 // Serve the login page at the root URL
 app.get('/', (req, res) => {
-    const filePath = path.join(__dirname, 'public', 'login.html');
-    console.log('Serving login.html from:', filePath);
+    const filePath = path.join(publicPath, 'login.html');
+    console.log(`📄 Serving login.html from: ${filePath}`);
     res.sendFile(filePath);
 });
 
 // Catch-all route to serve any HTML file from public
 app.get('*.html', (req, res) => {
     const fileName = req.path.substring(1);
-    const filePath = path.join(__dirname, 'public', fileName);
-    console.log('Serving file:', filePath);
+    const filePath = path.join(publicPath, fileName);
+    console.log(`📄 Serving file: ${filePath}`);
     res.sendFile(filePath);
 });
 
