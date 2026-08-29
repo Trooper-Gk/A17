@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadProtocols();
         loadLockdown();
         loadProtocolsForRedaction();
+        loadHistory('ethics');
         
         // Setup navigation
         document.querySelectorAll('.admin-nav button').forEach(btn => {
@@ -61,6 +62,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+// ============ USER MANAGEMENT ============
+
 async function loadUsers() {
     try {
         const response = await fetch('/api/admin/users');
@@ -76,10 +79,12 @@ async function loadUsers() {
                 <td>${user.rank || 'N/A'}</td>
                 <td>${user.is_admin ? '✅' : '❌'}</td>
                 <td>${user.is_super_admin ? '⭐' : ''}</td>
+                <td><span class="version-badge version-current">v${user.version || 1}</span></td>
                 <td>${new Date(user.last_login || user.created_at).toLocaleDateString()}</td>
                 <td>
                     <button class="edit-btn" onclick="editUser(${user.id})">✎</button>
                     ${!user.is_super_admin ? `<button class="edit-btn delete-btn" onclick="deleteUser(${user.id})">✕</button>` : ''}
+                    <button class="edit-btn" onclick="viewUserHistory(${user.id})">📜</button>
                 </td>
             </tr>
         `).join('');
@@ -87,7 +92,7 @@ async function loadUsers() {
     } catch (error) {
         console.error('Error loading users:', error);
         document.getElementById('usersTableBody').innerHTML = 
-            '<tr><td colspan="8" style="text-align:center;color:#ff0000;">Error loading users</td></tr>';
+            '<tr><td colspan="9" style="text-align:center;color:#ff0000;">Error loading users</td></tr>';
     }
 }
 
@@ -144,7 +149,43 @@ async function deleteUser(userId) {
     }
 }
 
-// Load Ethics with redaction display
+async function editUser(userId) {
+    // Simple prompt-based edit for now
+    const newUsername = prompt('Enter new username:');
+    if (newUsername) {
+        try {
+            const response = await fetch(`/api/admin/users/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: newUsername })
+            });
+            if (response.ok) {
+                alert('User updated!');
+                loadUsers();
+            }
+        } catch (error) {
+            alert('Error updating user: ' + error.message);
+        }
+    }
+}
+
+async function viewUserHistory(userId) {
+    // Switch to history tab
+    document.querySelector('.admin-nav button[data-target="history"]').click();
+    await loadHistory('users');
+    // Scroll to the user's history
+    const userSection = document.querySelector(`#historyContent [data-user-id="${userId}"]`);
+    if (userSection) {
+        userSection.scrollIntoView({ behavior: 'smooth' });
+        userSection.style.border = '2px solid #00ff00';
+        setTimeout(() => {
+            userSection.style.border = '1px solid rgba(0,255,0,0.2)';
+        }, 3000);
+    }
+}
+
+// ============ ETHICS MANAGEMENT ============
+
 async function loadEthics() {
     try {
         const response = await fetch('/api/admin/ethics');
@@ -155,23 +196,22 @@ async function loadEthics() {
         container.innerHTML = ethics.map(e => `
             <div style="border-bottom: 1px solid rgba(0,255,0,0.1); padding: 10px 0;">
                 <strong>LEVEL ${e.clearance_level}</strong>
+                <span class="version-badge version-current">v${e.version || 1}</span>
+                <span style="font-size: 11px; color: rgba(0,255,0,0.4); margin-left: 10px;">
+                    Updated: ${new Date(e.updated_at).toLocaleString()}
+                </span>
                 <div style="margin: 5px 0; font-size: 13px; background: rgba(0,0,0,0.3); padding: 10px; 
                     white-space: pre-wrap; word-break: break-all;">
-                    ${e.content.replace(/\[REDACT:(\d+):([^\]]*)\]/g, (match, level, text) => 
-                        `<span style="background: #ff000033; padding: 2px 5px; border: 1px solid #ff0000; 
-                            border-radius: 3px;">🔴 [REQUIRES LEVEL ${level}]</span>`
-                    )}
+                    ${displayRedactions(e.content)}
                 </div>
-                <div style="font-size: 11px; color: rgba(0,255,0,0.4);">
-                    Updated: ${new Date(e.updated_at).toLocaleString()}
-                </div>
+                <button class="edit-btn" onclick="viewEthicsHistory(${e.clearance_level})">📜 View History</button>
             </div>
         `).join('');
         
         // Set edit form
         const select = document.getElementById('ethicsLevel');
         select.innerHTML = ethics.map(e => 
-            `<option value="${e.clearance_level}">Level ${e.clearance_level}</option>`
+            `<option value="${e.clearance_level}">Level ${e.clearance_level} (v${e.version || 1})</option>`
         ).join('');
         
         // Load first ethics content
@@ -191,7 +231,7 @@ async function loadEthics() {
         const redactSelect = document.getElementById('redactEthicsLevel');
         if (redactSelect) {
             redactSelect.innerHTML = ethics.map(e => 
-                `<option value="${e.clearance_level}">Level ${e.clearance_level}</option>`
+                `<option value="${e.clearance_level}">Level ${e.clearance_level} (v${e.version || 1})</option>`
             ).join('');
             
             if (ethics.length > 0) {
@@ -228,7 +268,7 @@ async function updateEthics(e) {
         
         const result = await response.json();
         if (response.ok) {
-            alert('Ethics updated successfully!');
+            alert(`Ethics updated successfully! Version: ${result.version}`);
             loadEthics();
         } else {
             alert('Error: ' + (result.error || 'Failed to update ethics'));
@@ -238,7 +278,24 @@ async function updateEthics(e) {
     }
 }
 
-// Load Protocols with redaction display
+async function viewEthicsHistory(level) {
+    document.querySelector('.admin-nav button[data-target="history"]').click();
+    await loadHistory('ethics');
+    // Find and highlight the ethics section
+    const sections = document.querySelectorAll('#historyContent .history-item');
+    sections.forEach(s => {
+        if (s.dataset.level == level) {
+            s.scrollIntoView({ behavior: 'smooth' });
+            s.style.border = '2px solid #00ff00';
+            setTimeout(() => {
+                s.style.border = '1px solid rgba(0,255,0,0.2)';
+            }, 3000);
+        }
+    });
+}
+
+// ============ PROTOCOL MANAGEMENT ============
+
 async function loadProtocols() {
     try {
         const response = await fetch('/api/admin/protocols');
@@ -248,20 +305,16 @@ async function loadProtocols() {
         const container = document.getElementById('protocolsList');
         container.innerHTML = protocols.map(p => `
             <div style="border-bottom: 1px solid rgba(0,255,0,0.1); padding: 10px 0;">
-                <strong>${p.title.replace(/\[REDACT:(\d+):([^\]]*)\]/g, (match, level, text) => 
-                    `<span style="background: #ff000033; padding: 2px 5px; border: 1px solid #ff0000; 
-                        border-radius: 3px;">🔴 [REQUIRES LEVEL ${level}]</span>`
-                )}</strong> 
+                <strong>${displayRedactions(p.title)}</strong> 
+                <span class="version-badge version-current">v${p.version || 1}</span>
                 <span style="font-size: 11px; color: rgba(0,255,0,0.5);">(Level ${p.clearance_level})</span>
                 <div style="margin: 5px 0; font-size: 13px; background: rgba(0,0,0,0.3); padding: 10px;
                     white-space: pre-wrap; word-break: break-all;">
-                    ${p.content.replace(/\[REDACT:(\d+):([^\]]*)\]/g, (match, level, text) => 
-                        `<span style="background: #ff000033; padding: 2px 5px; border: 1px solid #ff0000; 
-                            border-radius: 3px;">🔴 [REQUIRES LEVEL ${level}]</span>`
-                    )}
+                    ${displayRedactions(p.content)}
                 </div>
                 <div style="font-size: 11px; color: rgba(0,255,0,0.4);">
                     Added: ${new Date(p.created_at).toLocaleString()}
+                    <button class="edit-btn" onclick="viewProtocolHistory(${p.id})" style="margin-left: 10px;">📜 View History</button>
                 </div>
             </div>
         `).join('');
@@ -293,7 +346,7 @@ async function createProtocol(e) {
         
         const result = await response.json();
         if (response.ok) {
-            alert('Protocol created successfully!');
+            alert(`Protocol created successfully! Version: ${result.version}`);
             form.reset();
             loadProtocols();
         } else {
@@ -304,7 +357,23 @@ async function createProtocol(e) {
     }
 }
 
-// Load Lockdown with redaction display
+async function viewProtocolHistory(protocolId) {
+    document.querySelector('.admin-nav button[data-target="history"]').click();
+    await loadHistory('protocols');
+    const sections = document.querySelectorAll('#historyContent .history-item');
+    sections.forEach(s => {
+        if (s.dataset.id == protocolId) {
+            s.scrollIntoView({ behavior: 'smooth' });
+            s.style.border = '2px solid #00ff00';
+            setTimeout(() => {
+                s.style.border = '1px solid rgba(0,255,0,0.2)';
+            }, 3000);
+        }
+    });
+}
+
+// ============ LOCKDOWN MANAGEMENT ============
+
 async function loadLockdown() {
     try {
         const response = await fetch('/api/admin/lockdown');
@@ -314,20 +383,16 @@ async function loadLockdown() {
         const container = document.getElementById('lockdownList');
         container.innerHTML = lockdowns.map(l => `
             <div style="border-bottom: 1px solid rgba(0,255,0,0.1); padding: 10px 0;">
-                <strong>${l.code.replace(/\[REDACT:(\d+):([^\]]*)\]/g, (match, level, text) => 
-                    `<span style="background: #ff000033; padding: 2px 5px; border: 1px solid #ff0000; 
-                        border-radius: 3px;">🔴 [REQUIRES LEVEL ${level}]</span>`
-                )}</strong> 
+                <strong>${displayRedactions(l.code)}</strong> 
+                <span class="version-badge version-current">v${l.version || 1}</span>
                 <span style="font-size: 11px; color: rgba(0,255,0,0.5);">(Level ${l.clearance_level})</span>
                 <div style="margin: 5px 0; font-size: 13px; background: rgba(0,0,0,0.3); padding: 10px;
                     white-space: pre-wrap; word-break: break-all;">
-                    ${l.description.replace(/\[REDACT:(\d+):([^\]]*)\]/g, (match, level, text) => 
-                        `<span style="background: #ff000033; padding: 2px 5px; border: 1px solid #ff0000; 
-                            border-radius: 3px;">🔴 [REQUIRES LEVEL ${level}]</span>`
-                    )}
+                    ${displayRedactions(l.description)}
                 </div>
                 <div style="font-size: 11px; color: rgba(0,255,0,0.4);">
                     Updated: ${new Date(l.updated_at).toLocaleString()}
+                    <button class="edit-btn" onclick="viewLockdownHistory(${l.clearance_level})" style="margin-left: 10px;">📜 View History</button>
                 </div>
             </div>
         `).join('');
@@ -335,7 +400,7 @@ async function loadLockdown() {
         // Set edit form
         const select = document.getElementById('lockdownLevel');
         select.innerHTML = lockdowns.map(l => 
-            `<option value="${l.clearance_level}">Level ${l.clearance_level}</option>`
+            `<option value="${l.clearance_level}">Level ${l.clearance_level} (v${l.version || 1})</option>`
         ).join('');
         
         if (lockdowns.length > 0) {
@@ -356,7 +421,7 @@ async function loadLockdown() {
         const redactSelect = document.getElementById('redactLockdownLevel');
         if (redactSelect) {
             redactSelect.innerHTML = lockdowns.map(l => 
-                `<option value="${l.clearance_level}">Level ${l.clearance_level}</option>`
+                `<option value="${l.clearance_level}">Level ${l.clearance_level} (v${l.version || 1})</option>`
             ).join('');
             
             if (lockdowns.length > 0) {
@@ -365,172 +430,4 @@ async function loadLockdown() {
             }
             
             redactSelect.addEventListener('change', () => {
-                const level = parseInt(redactSelect.value);
-                const found = lockdowns.find(l => l.clearance_level === level);
-                if (found) {
-                    document.getElementById('redactLockdownCode').value = found.code;
-                    document.getElementById('redactLockdownDescription').value = found.description;
-                }
-            });
-        }
-        
-    } catch (error) {
-        console.error('Error loading lockdown codes:', error);
-    }
-}
-
-async function updateLockdown(e) {
-    e.preventDefault();
-    const form = e.target;
-    const formData = new FormData(form);
-    const level = formData.get('level');
-    const code = formData.get('code');
-    const description = formData.get('description');
-    
-    try {
-        const response = await fetch(`/api/admin/lockdown/${level}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, description })
-        });
-        
-        const result = await response.json();
-        if (response.ok) {
-            alert('Lockdown code updated successfully!');
-            loadLockdown();
-        } else {
-            alert('Error: ' + (result.error || 'Failed to update lockdown code'));
-        }
-    } catch (error) {
-        alert('Error updating lockdown code: ' + error.message);
-    }
-}
-
-// Load protocols for redaction dropdown
-async function loadProtocolsForRedaction() {
-    try {
-        const response = await fetch('/api/admin/protocols');
-        if (!response.ok) throw new Error('Failed to load protocols');
-        const protocols = await response.json();
-        
-        const select = document.getElementById('redactProtocolSelect');
-        select.innerHTML = protocols.map(p => 
-            `<option value="${p.id}">${p.title} (Level ${p.clearance_level})</option>`
-        ).join('');
-        
-        // Load first protocol content
-        if (protocols.length > 0) {
-            document.getElementById('redactProtocolContent').value = protocols[0].content;
-        }
-        
-        // Add change listener
-        select.addEventListener('change', () => {
-            const id = parseInt(select.value);
-            const found = protocols.find(p => p.id === id);
-            if (found) {
-                document.getElementById('redactProtocolContent').value = found.content;
-            }
-        });
-        
-    } catch (error) {
-        console.error('Error loading protocols for redaction:', error);
-    }
-}
-
-// Redact Ethics
-async function redactEthics(e) {
-    e.preventDefault();
-    const form = e.target;
-    const formData = new FormData(form);
-    const level = formData.get('level');
-    const content = formData.get('content');
-    
-    try {
-        const response = await fetch('/api/admin/ethics/redact', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ level, content })
-        });
-        
-        const result = await response.json();
-        if (response.ok) {
-            alert('Ethics redactions applied successfully!');
-            loadEthics();
-        } else {
-            alert('Error: ' + (result.error || 'Failed to apply redactions'));
-        }
-    } catch (error) {
-        alert('Error applying redactions: ' + error.message);
-    }
-}
-
-// Redact Protocol
-async function redactProtocol(e) {
-    e.preventDefault();
-    const form = e.target;
-    const formData = new FormData(form);
-    const protocolId = formData.get('protocolId');
-    const content = formData.get('content');
-    
-    if (!protocolId) {
-        alert('Please select a protocol');
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/admin/protocols/${protocolId}/redact`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content })
-        });
-        
-        const result = await response.json();
-        if (response.ok) {
-            alert('Protocol redactions applied successfully!');
-            loadProtocols();
-            loadProtocolsForRedaction();
-        } else {
-            alert('Error: ' + (result.error || 'Failed to apply redactions'));
-        }
-    } catch (error) {
-        alert('Error applying redactions: ' + error.message);
-    }
-}
-
-// Redact Lockdown
-async function redactLockdown(e) {
-    e.preventDefault();
-    const form = e.target;
-    const formData = new FormData(form);
-    const level = formData.get('level');
-    const code = formData.get('code');
-    const description = formData.get('description');
-    
-    try {
-        const response = await fetch('/api/admin/lockdown/redact', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ level, code, description })
-        });
-        
-        const result = await response.json();
-        if (response.ok) {
-            alert('Lockdown redactions applied successfully!');
-            loadLockdown();
-        } else {
-            alert('Error: ' + (result.error || 'Failed to apply redactions'));
-        }
-    } catch (error) {
-        alert('Error applying redactions: ' + error.message);
-    }
-}
-
-async function logout() {
-    try {
-        await fetch('/api/logout', { method: 'POST' });
-        window.location.href = '/login.html';
-    } catch (error) {
-        console.error('Logout error:', error);
-        window.location.href = '/login.html';
-    }
-}
+                const level = parseInt(redactSelect.value
