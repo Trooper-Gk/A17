@@ -16,7 +16,9 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from the public folder (FIXED PATH)
+// Serve static files from the public folder
+// __dirname = /opt/render/project/src
+// So this looks for /opt/render/project/src/public
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
@@ -25,7 +27,7 @@ app.use(session({
     saveUninitialized: false,
     cookie: { 
         secure: false,
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        maxAge: 24 * 60 * 60 * 1000
     }
 }));
 
@@ -44,13 +46,12 @@ const logActivity = (userId, username, action, page, details = '', req = null) =
 const processRedactedContent = (content, userClearance) => {
     if (!content) return content;
     
-    // Pattern: [REDACT:LEVEL:TEXT]
     const redactionPattern = /\[REDACT:(\d+):([^\]]*)\]/g;
     
     return content.replace(redactionPattern, (match, level, text) => {
         const requiredLevel = parseInt(level);
         if (userClearance >= requiredLevel) {
-            return text; // Show the text if user has sufficient clearance
+            return text;
         } else {
             return `[REDACTED - Clearance Level ${requiredLevel} Required]`;
         }
@@ -59,7 +60,6 @@ const processRedactedContent = (content, userClearance) => {
 
 // ============ VERSIONING HELPER FUNCTIONS ============
 
-// Save ethics history
 const saveEthicsHistory = (ethicsId, level, content, userId, changeType) => {
     db.get('SELECT version FROM code_of_ethics WHERE id = ?', [ethicsId], (err, row) => {
         if (err || !row) return;
@@ -79,7 +79,6 @@ const saveEthicsHistory = (ethicsId, level, content, userId, changeType) => {
     });
 };
 
-// Save protocol history
 const saveProtocolHistory = (protocolId, title, content, level, userId, changeType) => {
     db.get('SELECT version FROM protocols WHERE id = ?', [protocolId], (err, row) => {
         if (err || !row) return;
@@ -99,7 +98,6 @@ const saveProtocolHistory = (protocolId, title, content, level, userId, changeTy
     });
 };
 
-// Save lockdown history
 const saveLockdownHistory = (lockdownId, level, code, description, userId, changeType) => {
     db.get('SELECT version FROM lockdown_codes WHERE id = ?', [lockdownId], (err, row) => {
         if (err || !row) return;
@@ -178,7 +176,6 @@ app.post('/api/login', (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         
-        // Update last login
         db.run('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
         
         req.session.userId = user.id;
@@ -222,7 +219,7 @@ app.get('/api/user', authenticateUser, (req, res) => {
     });
 });
 
-// Get user's dashboard data (with redaction processing)
+// Get user's dashboard data
 app.get('/api/dashboard/:level', authenticateUser, (req, res) => {
     const level = parseInt(req.params.level);
     
@@ -1010,8 +1007,16 @@ app.get('/api/admin/logs', requireAdmin, (req, res) => {
 });
 
 // ============ SERVE HTML ============
+// Serve the login page at the root URL
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Catch-all route to serve any HTML file from public
+app.get('*.html', (req, res) => {
+    const fileName = req.path.substring(1); // Remove leading slash
+    const filePath = path.join(__dirname, 'public', fileName);
+    res.sendFile(filePath);
 });
 
 app.listen(PORT, () => {
