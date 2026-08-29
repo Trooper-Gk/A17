@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCP Foundation - Access Portal</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="scp-header">
+            <div class="scp-logo">SCP FOUNDATION</div>
+            <div class="scp-subtitle">Secure. Contain. Protect.</div>
+            <div class="security-clearance">CLASSIFIED ACCESS</div>
+        </div>
+        
+        <div class="login-box">
+            <div class="terminal-prompt">$ ACCESS SCP DATABASE</div>
+            <div class="terminal-prompt">$ AUTHENTICATION REQUIRED</div>
+            
+            <form id="loginForm">
+                <div class="input-group">
+                    <label for="username">USERNAME:</label>
+                    <input type="text" id="username" name="username" required autofocus>
+                </div>
+                
+                <div class="input-group">
+                    <label for="password">PASSWORD:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <div class="login-error" id="loginError"></div>
+                
+                <button type="submit" class="login-btn">ACCESS DATABASE</button>
+            </form>
+            
+            <div class="login-footer">
+                <div class="warning-text">⚠ UNAUTHORIZED ACCESS IS PROHIBITED ⚠</div>
+                <div class="warning-text">All access attempts are logged and monitored</div>
+            </div>
+        </div>
+    </div>
+    <script src="/js/login.js"></script>
+</body>
+</html>
